@@ -62,20 +62,18 @@ docs_view.open = function(self, e, view)
       opts.max_height = documentation.max_height
     end
 
-    -- update this method to improve Markdown previews with treesitter
-    local process_markdown = function(bufnr, contents)
-      contents = vim.lsp.util._normalize_markdown(contents, {
-        width = vim.lsp.util._make_floating_popup_size(contents, opts),
-      })
-      vim.bo[bufnr].filetype = 'markdown'
-      vim.treesitter.start(bufnr)
-      vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, contents)
+    -- updated this method to improve Markdown previews with treesitter
+    local bufnr = self.window:get_buffer()
+    documents = vim.lsp.util._normalize_markdown(documents, {
+      width = vim.lsp.util._make_floating_popup_size(documents, opts),
+    })
 
-      return contents
-    end
+    vim.bo[bufnr].filetype = 'markdown'
+    vim.treesitter.start(bufnr)
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, documents)
 
+    -- replaced this invocation
     -- vim.lsp.util.stylize_markdown(self.window:get_buffer(), documents, opts)
-    return process_markdown(self.window:get_buffer(), documents)
   end
 
   -- Set buffer as not modified, so it can be removed without errors
