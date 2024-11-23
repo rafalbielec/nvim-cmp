@@ -22,6 +22,61 @@ docs_view.new = function()
   return self
 end
 
+docs_view.markdownToPlainText = function(markdownTable)
+  local plainTextTable = {}
+
+  for _, markdown in ipairs(markdownTable) do
+    -- Start with the original string
+    local plainText = markdown
+
+    -- Remove code fences and language specifiers (e.g., ```csharp)
+    plainText = plainText:gsub('```[%w]*\n?', '')
+    plainText = plainText:gsub('```', '')
+
+    -- Remove inline code
+    plainText = plainText:gsub('`(.-)`', '%1')
+
+    -- Remove emphasis (bold, italic)
+    plainText = plainText:gsub('%*%*([^%*]+)%*%*', '%1') -- Bold (**text**)
+    plainText = plainText:gsub('%_%_([^%_]+)%_%_', '%1') -- Bold (__text__)
+    plainText = plainText:gsub('%*([^%*]+)%*', '%1') -- Italic (*text*)
+    plainText = plainText:gsub('%_([^%_]+)%_', '%1') -- Italic (_text_)
+
+    -- Remove strikethrough
+    plainText = plainText:gsub('~~(.-)~~', '%1')
+
+    -- Remove links but keep the text
+    plainText = plainText:gsub('%[([^%]]+)%]%([^%)]+%)', '%1')
+
+    -- Remove images but keep the alt text
+    plainText = plainText:gsub('!%[([^%]]+)%]%([^%)]+%)', '%1')
+
+    -- Decode HTML entities like &nbsp; (replacing just common ones)
+    plainText = plainText:gsub('&nbsp;', ' ')
+    plainText = plainText:gsub('&lt;', '<')
+    plainText = plainText:gsub('&gt;', '>')
+    plainText = plainText:gsub('&amp;', '&')
+
+    -- Remove blockquotes
+    plainText = plainText:gsub('^>+', '')
+
+    -- Remove lists
+    plainText = plainText:gsub('^%s*[-*+]%s+', '')
+    plainText = plainText:gsub('^%s*%d+%.%s+', '')
+
+    -- Remove escaped characters (e.g., "\)")
+    plainText = plainText:gsub('\\(%p)', '%1')
+
+    -- Strip extra newlines or whitespace from the edges
+    plainText = plainText:gsub('^%s+', ''):gsub('%s+$', '')
+
+    -- Add cleaned text to the result table
+    table.insert(plainTextTable, plainText)
+  end
+
+  return plainTextTable
+end
+
 ---Open documentation window
 ---@param e cmp.Entry
 ---@param view cmp.WindowStyle
@@ -62,15 +117,18 @@ docs_view.open = function(self, e, view)
       opts.max_height = documentation.max_height
     end
 
-    -- updated this method to improve Markdown previews with treesitter
     local bufnr = self.window:get_buffer()
-    documents = vim.lsp.util._normalize_markdown(documents, {
-      width = vim.lsp.util._make_floating_popup_size(documents, opts),
-    })
+    local md = self.markdownToPlainText(documents)
+    local cleanedTable = {}
 
-    vim.bo[bufnr].filetype = 'markdown'
-    vim.treesitter.start(bufnr)
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, documents)
+    -- remove empty strings which translate into new lines in the pop-up
+    for _, value in ipairs(md) do
+      if value ~= '' then
+        table.insert(cleanedTable, value)
+      end
+    end
+
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, cleanedTable)
 
     -- replaced this invocation
     -- vim.lsp.util.stylize_markdown(self.window:get_buffer(), documents, opts)
